@@ -17,6 +17,8 @@ function http_get($url)
 $domains = http_get("https://otx.alienvault.com/api/v1/indicators/IPv4/$host/passive_dns");
 $data = json_decode($domains, true);
 
+print_r($domains);
+
 foreach ($data['passive_dns'] as $key) {
     $domain[] = $key['hostname'];
 }
