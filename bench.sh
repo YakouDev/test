@@ -55,6 +55,70 @@ next() {
     printf "%-70s\n" "-" | sed 's/\s/-/g'
 }
 
+echostyle(){
+  if hash tput 2>$NULL; then
+    echo " $(tput setaf 6)$1$(tput sgr0)"
+    echo " $1" >> $log
+  else
+    echo " $1" | tee -a $log
+  fi
+}
+
+averageio() {
+  ioraw1=$( echo $1 | awk 'NR==1 {print $1}' )
+    [ "$(echo $1 | awk 'NR==1 {print $2}')" == "GB/s" ] && ioraw1=$( awk 'BEGIN{print '$ioraw1' * 1024}' )
+  ioraw2=$( echo $2 | awk 'NR==1 {print $1}' )
+    [ "$(echo $2 | awk 'NR==1 {print $2}')" == "GB/s" ] && ioraw2=$( awk 'BEGIN{print '$ioraw2' * 1024}' )
+  ioraw3=$( echo $3 | awk 'NR==1 {print $1}' )
+    [ "$(echo $3 | awk 'NR==1 {print $2}')" == "GB/s" ] && ioraw3=$( awk 'BEGIN{print '$ioraw3' * 1024}' )
+  ioall=$( awk 'BEGIN{print '$ioraw1' + '$ioraw2' + '$ioraw3'}' )
+  ioavg=$( awk 'BEGIN{printf "%.1f", '$ioall' / 3}' )
+  printf "%s" "$ioavg"
+}
+
+cpubench() {
+  if hash $1 2>$NULL; then
+    io=$( ( dd if=/dev/zero bs=512K count=$2 | $1 ) 2>&1 | grep 'copied' | awk -F, '{io=$NF} END {print io}' )
+    if [[ $io != *"."* ]]; then
+      printf "%4i %s" "${io% *}" "${io##* }"
+    else
+      printf "%4i.%s" "${io%.*}" "${io#*.}"
+    fi
+  else
+    printf " %s not found on system." "$1"
+  fi
+}
+
+freedisk() {
+  # check free space
+  #spacename=$( df -m . | awk 'NR==2 {print $1}' )
+  #spacenamelength=$(echo ${spacename} | awk '{print length($0)}')
+  #if [[ $spacenamelength -gt 20 ]]; then
+    # freespace=$( df -m . | awk 'NR==3 {print $3}' )
+  #else
+  # freespace=$( df -m . | awk 'NR==2 {print $4}' )
+  #fi
+  freespace=$( df -m . | awk 'NR==2 {print $4}' )
+  if [[ $freespace == "" ]]; then
+    $freespace=$( df -m . | awk 'NR==3 {print $3}' )
+  fi
+  if [[ $freespace -gt 1024 ]]; then
+    printf "%s" $((1024*2))
+  elif [[ $freespace -gt 512 ]]; then
+    printf "%s" $((512*2))
+  elif [[ $freespace -gt 256 ]]; then
+    printf "%s" $((256*2))
+  elif [[ $freespace -gt 128 ]]; then
+    printf "%s" $((128*2))
+  else
+    printf "1"
+  fi
+}
+
+write_test() {
+    (LANG=C dd if=/dev/zero of=test_file_$$ bs=512K count=$1 conv=fdatasync && rm -f test_file_$$ ) 2>&1 | awk -F, '{io=$NF} END { print io}' | sed 's/^[ \t]*//;s/[ \t]*$//'
+}
+
 speed_test() {
     local nodeName="$2"
     if [ -z "$1" ];then
